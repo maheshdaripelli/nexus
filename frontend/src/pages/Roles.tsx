@@ -1,0 +1,7 @@
+import { Plus, ShieldCheck } from "lucide-react";
+import SectionHeading from "../components/SectionHeading";
+import { roles } from "../data/demo";
+
+export default function RolesPage() {
+  return <div><SectionHeading title="Roles & permissions" description="Control what people can see and do in your workspace." action={<button className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"><Plus size={15}/>Create role</button>}/><div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="divide-y divide-slate-100">{roles.map(role=><div key={role.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center"><div className="flex flex-1 items-start gap-3"><div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600"><ShieldCheck size={19}/></div><div><h2 className="text-sm font-semibold text-slate-900">{role.name}</h2><p className="mt-1 text-xs text-slate-500">{role.description}</p><div className="mt-3 flex flex-wrap gap-1.5">{role.permissions.map(p=><span key={p} className="rounded-md bg-slate-50 px-2 py-1 text-[10px] text-slate-600">{p}</span>)}</div></div></div><div className="flex items-center justify-between gap-8 md:justify-end"><span className="text-xs text-slate-500">{role.users} assigned</span><button className="text-xs font-semibold text-indigo-600">Edit role</button></div></div>)}</div></div></div>;
+}
