@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.session import engine, get_db
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -62,8 +65,11 @@ async def database_health(db: AsyncSession = Depends(get_db)):
             "database": "connected",
             "test_query": value,
         }
-    except Exception:
+    except Exception as exc:
+        # Keep credentials and connection details out of the HTTP response,
+        # but log the full exception locally for troubleshooting.
+        logger.exception("Database health check failed")
         raise HTTPException(
             status_code=503,
-            detail="Database connection failed. Check server logs and database configuration.",
-        )
+            detail="Database connection failed. Check the server logs and database configuration.",
+        ) from exc
