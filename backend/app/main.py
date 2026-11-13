@@ -1,37 +1,69 @@
-from functools import lru_cache
+from contextlib import asynccontextmanager
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
-class Settings(BaseSettings):
-    APP_NAME: str = "Nexus API"
-    APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
-
-    API_V1_PREFIX: str = "/api/v1"
-
-    FRONTEND_ORIGIN: str = "http://localhost:5173"
-
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/nexus"
-    )
-
-    JWT_SECRET_KEY: str = "development-only-change-this-secret"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",
-    )
+from app.core.config import settings
+from app.db.session import engine, get_db
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Release database connections when the API process shuts down."""
+    yield
+    await engine.dispose()
 
 
-settings = get_settings()
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="Nexus User and Workspace Management Platform",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_ORIGIN],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/", tags=["Health"])
+async def root():
+    return {
+        "application": "Nexus",
+        "message": "Welcome to Nexus API",
+        "status": "running",
+    }
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    """Liveness check: confirms that the API process is responding."""
+    return {
+        "status": "healthy",
+        "database": "not_checked",
+    }
+
+
+@app.get("/health/database", tags=["Health"])
+async def database_health(db: AsyncSession = Depends(get_db)):
+    """Readiness check: executes a lightweight query against PostgreSQL."""
+    try:
+        result = await db.execute(text("SELECT 1"))
+        value = result.scalar_one()
+
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "test_query": value,
+        }
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection failed. Check server logs and database configuration.",
+        )
