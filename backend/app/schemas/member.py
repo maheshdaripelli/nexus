@@ -26,3 +26,4 @@ class InvitationResponse(BaseModel):
     status: str
     expires_at: datetime
     invitation_token: str
+    email_sent: bool = False
