@@ -58,6 +58,24 @@ def upgrade():
     )
     op.create_index("ix_permissions_key", "permissions", ["key"])
 
+    op.bulk_insert(
+        sa.table("permissions",
+            sa.column("id", postgresql.UUID(as_uuid=True)),
+            sa.column("key", sa.String(100)),
+            sa.column("description", sa.String(300)),
+        ),
+        [
+            {"id": __import__("uuid").uuid4(), "key": "members.read", "description": "View organization members"},
+            {"id": __import__("uuid").uuid4(), "key": "members.manage", "description": "Invite, update and remove members"},
+            {"id": __import__("uuid").uuid4(), "key": "teams.read", "description": "View teams"},
+            {"id": __import__("uuid").uuid4(), "key": "teams.manage", "description": "Create and manage teams"},
+            {"id": __import__("uuid").uuid4(), "key": "roles.read", "description": "View roles and permissions"},
+            {"id": __import__("uuid").uuid4(), "key": "roles.manage", "description": "Manage roles and permissions"},
+            {"id": __import__("uuid").uuid4(), "key": "audit.read", "description": "View organization audit history"},
+            {"id": __import__("uuid").uuid4(), "key": "workspace.manage", "description": "Manage workspace settings"},
+        ],
+    )
+
     op.create_table(
         "role_permissions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
