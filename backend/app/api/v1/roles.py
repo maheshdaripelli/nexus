@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.membership import Membership
 from app.models.role import Permission, Role, RolePermission
 from app.models.user import User
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/organizations/{organization_id}/roles", tags=["Roles and permissions"])
 
@@ -42,6 +43,8 @@ async def create_role(organization_id: UUID, payload: RoleCreate, db: AsyncSessi
     await require_admin(db, organization_id, user.id)
     role = Role(organization_id=organization_id, name=payload.name.strip(), description=payload.description, is_system=False)
     db.add(role)
+    await db.flush()
+    await record_audit_event(db, action="role.created", resource_type="role", organization_id=organization_id, actor_user_id=user.id, resource_id=role.id, details={"name": role.name})
     await db.commit()
     await db.refresh(role)
     return {"id": role.id, "name": role.name, "description": role.description, "permissions": []}
@@ -57,6 +60,7 @@ async def set_role_permissions(organization_id: UUID, role_id: UUID, payload: Ro
         raise HTTPException(status_code=400, detail="One or more permissions do not exist")
     await db.execute(RolePermission.__table__.delete().where(RolePermission.role_id == role.id))
     db.add_all([RolePermission(role_id=role.id, permission_id=p.id) for p in permissions])
+    await record_audit_event(db, action="role.permissions_updated", resource_type="role", organization_id=organization_id, actor_user_id=user.id, resource_id=role.id, details={"permission_keys": [p.key for p in permissions]})
     await db.commit()
     return {"role_id": role.id, "permissions": [p.key for p in permissions]}
 
