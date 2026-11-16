@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import Overview from "./pages/Overview";
 import UsersPage from "./pages/Users";
@@ -15,7 +15,7 @@ function ProtectedLayout() {
   const { user, loading } = useAuth();
   if (loading) return <div className="grid min-h-screen place-items-center text-sm text-slate-500">Loading Nexus…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  return <AppLayout />;
+  return <Outlet />;
 }
 
 function PublicOnly({ children }: { children: React.ReactNode }) {
