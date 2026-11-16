@@ -9,7 +9,9 @@ import SettingsPage from "./pages/Settings";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
-import OrganizationSetupPage from "./pages/OrganizationSetup";\nimport PlatformAdminPage from "./pages/PlatformAdmin";\nimport AcceptInvitationPage from "./pages/AcceptInvitation";
+import OrganizationSetupPage from "./pages/OrganizationSetup";
+import PlatformAdminPage from "./pages/PlatformAdmin";
+import AcceptInvitationPage from "./pages/AcceptInvitation";
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();
@@ -27,9 +29,11 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
-    <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />\n    <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+    <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
+    <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
     <Route element={<ProtectedLayout />}>
-      <Route path="/setup" element={<OrganizationSetupPage />} />\n      <Route path="/platform" element={<PlatformAdminPage />} />
+      <Route path="/setup" element={<OrganizationSetupPage />} />
+      <Route path="/platform" element={<PlatformAdminPage />} />
       <Route element={<AppLayout />}>
         <Route index element={<Overview />} />
         <Route path="users" element={<UsersPage />} />
