@@ -9,6 +9,7 @@ from app.models.membership import Membership
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationResponse, OrganizationUpdate
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
@@ -28,6 +29,7 @@ async def create_organization(payload: OrganizationCreate, db: AsyncSession = De
     db.add(org)
     await db.flush()
     db.add(Membership(organization_id=org.id, user_id=current_user.id, role="owner"))
+    await record_audit_event(db, action="organization.created", resource_type="organization", organization_id=org.id, actor_user_id=current_user.id, resource_id=org.id, details={"name": org.name})
     await db.commit()
     await db.refresh(org)
     return org
@@ -44,6 +46,7 @@ async def update_organization(organization_id: UUID, payload: OrganizationUpdate
         raise HTTPException(status_code=403, detail="You do not have permission to update this organization")
     org = await db.get(Organization, organization_id)
     org.name = payload.name.strip()
+    await record_audit_event(db, action="organization.updated", resource_type="organization", organization_id=org.id, actor_user_id=current_user.id, resource_id=org.id, details={"name": org.name})
     await db.commit()
     await db.refresh(org)
     return org
