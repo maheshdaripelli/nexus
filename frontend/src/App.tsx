@@ -9,7 +9,7 @@ import SettingsPage from "./pages/Settings";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
-import OrganizationSetupPage from "./pages/OrganizationSetup";
+import OrganizationSetupPage from "./pages/OrganizationSetup";\nimport PlatformAdminPage from "./pages/PlatformAdmin";
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();
@@ -29,7 +29,7 @@ function AppRoutes() {
     <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
     <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
     <Route element={<ProtectedLayout />}>
-      <Route path="/setup" element={<OrganizationSetupPage />} />
+      <Route path="/setup" element={<OrganizationSetupPage />} />\n      <Route path="/platform" element={<PlatformAdminPage />} />
       <Route element={<AppLayout />}>
         <Route index element={<Overview />} />
         <Route path="users" element={<UsersPage />} />
