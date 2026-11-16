@@ -13,6 +13,8 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.member import InvitationCreate, InvitationResponse, MemberResponse, MemberRoleUpdate
 from app.services.audit import record_audit_event
+from app.services.email import send_invitation_email
+from app.core.config import settings
 
 router = APIRouter(prefix="/organizations/{organization_id}", tags=["Organization members"])
 
@@ -66,6 +68,8 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
     if payload.role == "admin" and actor.role != "owner":
         raise HTTPException(status_code=403, detail="Only the organization owner can invite another admin")
     org = await db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
     email = str(payload.email).lower()
     existing_user = await db.scalar(select(User).where(User.email == email))
     if existing_user and await db.scalar(select(Membership.id).where(Membership.organization_id == organization_id, Membership.user_id == existing_user.id)):
@@ -79,7 +83,26 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
     await record_audit_event(db, action="invitation.created", resource_type="invitation", organization_id=organization_id, actor_user_id=user.id, resource_id=invitation.id, details={"email": email, "role": payload.role})
     await db.commit()
     await db.refresh(invitation)
-    return InvitationResponse(id=invitation.id, email=invitation.email, role=invitation.role, status=invitation.status, expires_at=invitation.expires_at, invitation_token=raw_token)
+    invitation_url = (
+        f"{settings.FRONTEND_ORIGIN.rstrip('/')}/accept-invitation"
+        f"?organization_id={organization_id}&token={raw_token}"
+    )
+    email_sent = await send_invitation_email(
+        to_email=email,
+        organization_name=org.name,
+        role=payload.role,
+        invitation_url=invitation_url,
+        expires_at=invitation.expires_at.isoformat(),
+    )
+    return InvitationResponse(
+        id=invitation.id,
+        email=invitation.email,
+        role=invitation.role,
+        status=invitation.status,
+        expires_at=invitation.expires_at,
+        invitation_token=raw_token,
+        email_sent=email_sent,
+    )
 
 @router.post("/invitations/accept")
 async def accept_invitation(token: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
