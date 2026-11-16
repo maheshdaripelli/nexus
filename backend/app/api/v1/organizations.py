@@ -7,6 +7,7 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.membership import Membership
 from app.models.organization import Organization
+from app.models.platform_admin import PlatformAdmin
 from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationResponse, OrganizationUpdate
 from app.services.audit import record_audit_event
@@ -25,6 +26,9 @@ async def require_membership(db: AsyncSession, org_id: UUID, user_id: UUID):
 
 @router.post("", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
 async def create_organization(payload: OrganizationCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Defense in depth: only provisioned platform administrators may create tenants.
+    if await db.get(PlatformAdmin, current_user.id) is None:
+        raise HTTPException(status_code=403, detail="Only a platform administrator can create organizations")
     org = Organization(name=payload.name.strip(), slug=make_slug(payload.name))
     db.add(org)
     await db.flush()
