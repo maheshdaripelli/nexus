@@ -8,6 +8,7 @@ from app.models.membership import Membership
 from app.models.team import Team
 from app.models.user import User
 from app.schemas.team import TeamCreate, TeamResponse
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/organizations/{organization_id}/teams", tags=["Teams"])
 
@@ -24,6 +25,8 @@ async def create_team(organization_id: UUID, payload: TeamCreate, db: AsyncSessi
         raise HTTPException(status_code=403, detail="Only organization admins can create teams")
     team = Team(organization_id=organization_id, name=payload.name.strip(), description=payload.description)
     db.add(team)
+    await db.flush()
+    await record_audit_event(db, action="team.created", resource_type="team", organization_id=organization_id, actor_user_id=current_user.id, resource_id=team.id, details={"name": team.name})
     await db.commit()
     await db.refresh(team)
     return team
