@@ -62,12 +62,16 @@ async def remove_member(organization_id: UUID, user_id: UUID, db: AsyncSession =
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def create_invitation(organization_id: UUID, payload: InvitationCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await admin_membership(db, organization_id, user.id)
+    actor = await admin_membership(db, organization_id, user.id)
+    if payload.role == "admin" and actor.role != "owner":
+        raise HTTPException(status_code=403, detail="Only the organization owner can invite another admin")
     org = await db.get(Organization, organization_id)
     email = str(payload.email).lower()
     existing_user = await db.scalar(select(User).where(User.email == email))
     if existing_user and await db.scalar(select(Membership.id).where(Membership.organization_id == organization_id, Membership.user_id == existing_user.id)):
         raise HTTPException(status_code=409, detail="User is already a member")
+    if await db.scalar(select(Invitation.id).where(Invitation.organization_id == organization_id, Invitation.email == email, Invitation.status == "pending")):
+        raise HTTPException(status_code=409, detail="A pending invitation already exists for this email")
     raw_token = secrets.token_urlsafe(32)
     invitation = Invitation(organization_id=organization_id, email=email, role=payload.role, token_hash=hashlib.sha256(raw_token.encode()).hexdigest(), invited_by_user_id=user.id, expires_at=datetime.now(timezone.utc)+timedelta(days=7))
     db.add(invitation)
@@ -80,7 +84,7 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
 @router.post("/invitations/accept")
 async def accept_invitation(token: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    invitation = await db.scalar(select(Invitation).where(Invitation.token_hash == token_hash, Invitation.status == "pending"))
+    invitation = await db.scalar(select(Invitation).where(Invitation.token_hash == token_hash, Invitation.status == "pending").with_for_update())
     if invitation is None or invitation.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invitation is invalid or expired")
     if user.email.lower() != invitation.email.lower():
