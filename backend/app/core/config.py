@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Resend email delivery. Leave blank to disable sending in local development.
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "Nexus <onboarding@resend.dev>"
+
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
