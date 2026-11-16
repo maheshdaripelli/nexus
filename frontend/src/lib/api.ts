@@ -119,8 +119,6 @@ export const healthCheck = () =>
   apiRequest<{ status: string; database?: string }>("/health/database");
 
 export const authApi = {
-  register: (payload: { email: string; full_name: string; password: string }) =>
-    apiRequest<TokenResponse>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   login: (payload: { email: string; password: string }) =>
     apiRequest<TokenResponse>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   me: () => apiRequest<TokenResponse["user"]>("/api/v1/auth/me"),
