@@ -8,6 +8,7 @@ from app.models.membership import Membership
 from app.models.team import Team
 from app.models.team_member import TeamMember
 from app.models.user import User
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/organizations/{organization_id}/teams", tags=["Team members"])
 
@@ -43,6 +44,7 @@ async def add_team_member(organization_id: UUID, team_id: UUID, user_id: UUID, d
     if existing:
         raise HTTPException(status_code=409, detail="User is already in this team")
     db.add(TeamMember(team_id=team_id, membership_id=target.id))
+    await record_audit_event(db, action="team.member_added", resource_type="team", organization_id=organization_id, actor_user_id=user.id, resource_id=team_id, details={"member_user_id": str(user_id)})
     await db.commit()
     return {"message": "Member added to team"}
 
@@ -57,5 +59,6 @@ async def remove_team_member(organization_id: UUID, team_id: UUID, user_id: UUID
         raise HTTPException(status_code=404, detail="Organization member not found")
     link = await db.scalar(select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.membership_id == target.id))
     if link is not None:
+        await record_audit_event(db, action="team.member_removed", resource_type="team", organization_id=organization_id, actor_user_id=user.id, resource_id=team_id, details={"member_user_id": str(user_id)})
         await db.delete(link)
         await db.commit()
