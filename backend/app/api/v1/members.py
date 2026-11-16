@@ -12,6 +12,7 @@ from app.models.membership import Membership
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.member import InvitationCreate, InvitationResponse, MemberResponse, MemberRoleUpdate
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/organizations/{organization_id}", tags=["Organization members"])
 
@@ -40,6 +41,7 @@ async def update_member_role(organization_id: UUID, user_id: UUID, payload: Memb
     if target.role == "owner" or (actor.role != "owner" and payload.role == "admin"):
         raise HTTPException(status_code=403, detail="Only the owner can change owner/admin privileges")
     target.role = payload.role
+    await record_audit_event(db, action="member.role_updated", resource_type="membership", organization_id=organization_id, actor_user_id=user.id, resource_id=target.id, details={"target_user_id": str(user_id), "role": payload.role})
     await db.commit()
     member = await db.get(User, user_id)
     return MemberResponse(id=target.id, organization_id=target.organization_id, user_id=target.user_id, role=target.role, created_at=target.created_at, email=member.email, full_name=member.full_name)
@@ -54,6 +56,7 @@ async def remove_member(organization_id: UUID, user_id: UUID, db: AsyncSession =
         raise HTTPException(status_code=403, detail="Insufficient permission to remove this member")
     if user_id == user.id:
         raise HTTPException(status_code=400, detail="Use organization ownership transfer before leaving as owner")
+    await record_audit_event(db, action="member.removed", resource_type="membership", organization_id=organization_id, actor_user_id=user.id, resource_id=target.id, details={"target_user_id": str(user_id)})
     await db.delete(target)
     await db.commit()
 
@@ -68,6 +71,8 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
     raw_token = secrets.token_urlsafe(32)
     invitation = Invitation(organization_id=organization_id, email=email, role=payload.role, token_hash=hashlib.sha256(raw_token.encode()).hexdigest(), invited_by_user_id=user.id, expires_at=datetime.now(timezone.utc)+timedelta(days=7))
     db.add(invitation)
+    await db.flush()
+    await record_audit_event(db, action="invitation.created", resource_type="invitation", organization_id=organization_id, actor_user_id=user.id, resource_id=invitation.id, details={"email": email, "role": payload.role})
     await db.commit()
     await db.refresh(invitation)
     return InvitationResponse(id=invitation.id, email=invitation.email, role=invitation.role, status=invitation.status, expires_at=invitation.expires_at, invitation_token=raw_token)
@@ -86,5 +91,6 @@ async def accept_invitation(token: str, db: AsyncSession = Depends(get_db), user
     db.add(Membership(organization_id=invitation.organization_id, user_id=user.id, role=invitation.role))
     invitation.status = "accepted"
     invitation.accepted_at = datetime.now(timezone.utc)
+    await record_audit_event(db, action="invitation.accepted", resource_type="invitation", organization_id=invitation.organization_id, actor_user_id=user.id, resource_id=invitation.id, details={"email": invitation.email})
     await db.commit()
     return {"organization_id": str(invitation.organization_id), "message": "Invitation accepted"}
