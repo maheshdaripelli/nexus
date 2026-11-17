@@ -23,11 +23,20 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Resend email delivery. Leave blank to disable sending in local development.
+    # Email provider: "smtp" for local Gmail SMTP, or "resend" for Resend API.
+    EMAIL_PROVIDER: str = "smtp"
+    EMAIL_FROM: str = "Nexus"
+
+    # Gmail SMTP (use a Google App Password, never your normal account password).
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+
+    # Resend settings, used only when EMAIL_PROVIDER="resend".
     RESEND_API_KEY: str = ""
-    EMAIL_FROM: str = "Nexus <onboarding@resend.dev>"
-    # Routes provider requests to Resend's simulator during local development.
-    # Keep false for real delivery after a verified sender domain is configured.
+    RESEND_FROM: str = "Nexus <onboarding@resend.dev>"
+    # Resend's simulator is only for provider testing, not real recipient delivery.
     EMAIL_TEST_MODE: bool = False
 
     model_config = SettingsConfigDict(
