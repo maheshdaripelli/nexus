@@ -37,7 +37,7 @@ class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_manager_can_manage_teams_but_not_members(self):
         membership = SimpleNamespace(role="manager", custom_role_id=None)
-        db = SimpleNamespace(scalar=AsyncMock(return_value=membership))
+        db = SimpleNamespace(scalar=AsyncMock(return_value=membership), get=AsyncMock(return_value=SimpleNamespace(is_active=True)))
 
         result = await require_permission(db, uuid4(), uuid4(), "teams.manage")
         self.assertIs(result, membership)
