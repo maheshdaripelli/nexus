@@ -12,6 +12,7 @@ from app.models.team import Team
 from app.models.user import User
 from app.schemas.team import TeamCreate, TeamResponse
 from app.services.audit import record_audit_event
+from app.services.authorization import require_permission
 
 router = APIRouter(prefix="/organizations/{organization_id}/teams", tags=["Teams"])
 
@@ -29,10 +30,7 @@ async def require_membership(db: AsyncSession, org_id: UUID, user_id: UUID):
 
 
 async def require_team_admin(db: AsyncSession, org_id: UUID, user_id: UUID):
-    membership = await require_membership(db, org_id, user_id)
-    if membership.role not in {"owner", "admin"}:
-        raise HTTPException(status_code=403, detail="Only organization admins can manage teams")
-    return membership
+    return await require_permission(db, org_id, user_id, "teams.manage")
 
 
 @router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
@@ -70,7 +68,7 @@ async def list_teams(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await require_membership(db, organization_id, current_user.id)
+    await require_permission(db, organization_id, current_user.id, "teams.read")
     result = await db.scalars(
         select(Team)
         .where(Team.organization_id == organization_id)
