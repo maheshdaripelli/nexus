@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.membership import Membership
-from app.models.role import Permission, RolePermission
+from app.models.role import Permission, Role, RolePermission
 
 
 BUILTIN_PERMISSIONS = {
@@ -40,8 +40,10 @@ async def require_permission(
         allowed = await db.scalar(
             select(Permission.id)
             .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .join(Role, Role.id == RolePermission.role_id)
             .where(
                 RolePermission.role_id == membership.custom_role_id,
+                Role.organization_id == organization_id,
                 Permission.key == permission,
             )
         )
