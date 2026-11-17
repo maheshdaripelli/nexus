@@ -10,6 +10,7 @@ from app.models.membership import Membership
 from app.models.role import Permission, Role, RolePermission
 from app.models.user import User
 from app.services.audit import record_audit_event
+from app.services.authorization import require_permission
 
 router = APIRouter(prefix="/organizations/{organization_id}/roles", tags=["Roles and permissions"])
 
@@ -24,14 +25,11 @@ async def require_admin(db: AsyncSession, org_id: UUID, user_id: UUID):
     membership = await db.scalar(select(Membership).where(Membership.organization_id == org_id, Membership.user_id == user_id))
     if membership is None:
         raise HTTPException(status_code=404, detail="Organization not found")
-    if membership.role not in {"owner", "admin"}:
-        raise HTTPException(status_code=403, detail="Organization admin permission required")
+    await require_permission(db, org_id, user_id, "roles.manage")
 
 @router.get("")
 async def list_roles(organization_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    membership = await db.scalar(select(Membership.id).where(Membership.organization_id == organization_id, Membership.user_id == user.id))
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Organization not found")
+    await require_permission(db, organization_id, user.id, "roles.read")
     roles = (await db.scalars(select(Role).where(Role.organization_id == organization_id).order_by(Role.name))).all()
     result = []
     for role in roles:
