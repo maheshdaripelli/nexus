@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
@@ -43,7 +44,11 @@ async def create_role(organization_id: UUID, payload: RoleCreate, db: AsyncSessi
     await require_admin(db, organization_id, user.id)
     role = Role(organization_id=organization_id, name=payload.name.strip(), description=payload.description, is_system=False)
     db.add(role)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="A role with this name already exists") from exc
     await record_audit_event(db, action="role.created", resource_type="role", organization_id=organization_id, actor_user_id=user.id, resource_id=role.id, details={"name": role.name})
     await db.commit()
     await db.refresh(role)
@@ -71,3 +76,31 @@ async def list_permissions(organization_id: UUID, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="Organization not found")
     permissions = (await db.scalars(select(Permission).order_by(Permission.key))).all()
     return [{"id": p.id, "key": p.key, "description": p.description} for p in permissions]
+
+
+@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role(
+    organization_id: UUID,
+    role_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await require_admin(db, organization_id, user.id)
+    role = await db.scalar(
+        select(Role).where(Role.id == role_id, Role.organization_id == organization_id)
+    )
+    if role is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if role.is_system:
+        raise HTTPException(status_code=400, detail="System roles cannot be deleted")
+    await record_audit_event(
+        db,
+        action="role.deleted",
+        resource_type="role",
+        organization_id=organization_id,
+        actor_user_id=user.id,
+        resource_id=role.id,
+        details={"name": role.name},
+    )
+    await db.delete(role)
+    await db.commit()
