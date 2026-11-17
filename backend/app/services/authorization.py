@@ -11,9 +11,9 @@ from app.models.role import Permission, RolePermission
 BUILTIN_PERMISSIONS = {
     "owner": {"*"},
     "admin": {"*"},
-    "manager": {"members.read", "teams.read", "teams.manage", "audit.read"},
-    "member": {"members.read", "teams.read"},
-    "viewer": {"members.read", "teams.read"},
+    "manager": {"members.read", "teams.read", "teams.manage", "audit.read", "roles.read"},
+    "member": {"members.read", "teams.read", "roles.read"},
+    "viewer": {"members.read", "teams.read", "roles.read"},
 }
 
 
