@@ -16,6 +16,7 @@ from app.schemas.member import InvitationCreate, InvitationResponse, MemberRespo
 from app.services.audit import record_audit_event
 from app.services.email import send_invitation_email
 from app.core.config import settings
+from app.services.authorization import require_permission
 
 router = APIRouter(prefix="/organizations/{organization_id}", tags=["Organization members"])
 
@@ -23,17 +24,13 @@ async def admin_membership(db: AsyncSession, org_id: UUID, user_id: UUID):
     membership = await db.scalar(select(Membership).where(Membership.organization_id == org_id, Membership.user_id == user_id))
     if membership is None:
         raise HTTPException(status_code=404, detail="Organization not found")
-    if membership.role not in {"owner", "admin"}:
-        raise HTTPException(status_code=403, detail="Organization admin permission required")
-    return membership
+    return await require_permission(db, org_id, user_id, "members.manage")
 
 @router.get("/members", response_model=list[MemberResponse])
 async def list_members(organization_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    membership = await db.scalar(select(Membership).where(Membership.organization_id == organization_id, Membership.user_id == user.id))
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Organization not found")
+    await require_permission(db, organization_id, user.id, "members.read")
     rows = (await db.execute(select(Membership, User).join(User, User.id == Membership.user_id).where(Membership.organization_id == organization_id).order_by(Membership.created_at))).all()
-    return [MemberResponse(id=m.id, organization_id=m.organization_id, user_id=m.user_id, role=m.role, created_at=m.created_at, email=u.email, full_name=u.full_name) for m,u in rows]
+    return [MemberResponse(id=m.id, organization_id=m.organization_id, user_id=m.user_id, role=m.role, custom_role_id=m.custom_role_id, created_at=m.created_at, email=u.email, full_name=u.full_name) for m,u in rows]
 
 @router.patch("/members/{user_id}", response_model=MemberResponse)
 async def update_member_role(organization_id: UUID, user_id: UUID, payload: MemberRoleUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
@@ -50,6 +47,7 @@ async def update_member_role(organization_id: UUID, user_id: UUID, payload: Memb
         if actor.role != "owner" and target.role == "admin":
             raise HTTPException(status_code=403, detail="Only the owner can change admin privileges")
         target.custom_role_id = custom_role.id
+        target.role = "custom"
     elif payload.role is not None:
         if actor.role != "owner" and payload.role == "admin":
             raise HTTPException(status_code=403, detail="Only the owner can assign admin privileges")
