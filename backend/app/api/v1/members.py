@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.invitation import Invitation
 from app.models.membership import Membership
 from app.models.organization import Organization
+from app.models.role import Role
 from app.models.user import User
 from app.schemas.member import InvitationCreate, InvitationResponse, MemberResponse, MemberRoleUpdate
 from app.services.audit import record_audit_event
@@ -40,10 +41,23 @@ async def update_member_role(organization_id: UUID, user_id: UUID, payload: Memb
     target = await db.scalar(select(Membership).where(Membership.organization_id == organization_id, Membership.user_id == user_id))
     if target is None:
         raise HTTPException(status_code=404, detail="Member not found")
-    if target.role == "owner" or (actor.role != "owner" and payload.role == "admin"):
-        raise HTTPException(status_code=403, detail="Only the owner can change owner/admin privileges")
-    target.role = payload.role
-    await record_audit_event(db, action="member.role_updated", resource_type="membership", organization_id=organization_id, actor_user_id=user.id, resource_id=target.id, details={"target_user_id": str(user_id), "role": payload.role})
+    if target.role == "owner":
+        raise HTTPException(status_code=403, detail="The organization owner role cannot be changed here")
+    if payload.custom_role_id is not None:
+        custom_role = await db.scalar(select(Role).where(Role.id == payload.custom_role_id, Role.organization_id == organization_id))
+        if custom_role is None:
+            raise HTTPException(status_code=404, detail="Custom role not found in this organization")
+        if actor.role != "owner" and target.role == "admin":
+            raise HTTPException(status_code=403, detail="Only the owner can change admin privileges")
+        target.custom_role_id = custom_role.id
+    elif payload.role is not None:
+        if actor.role != "owner" and payload.role == "admin":
+            raise HTTPException(status_code=403, detail="Only the owner can assign admin privileges")
+        target.role = payload.role
+        target.custom_role_id = None
+    else:
+        raise HTTPException(status_code=400, detail="Provide either a built-in role or a custom_role_id")
+    await record_audit_event(db, action="member.role_updated", resource_type="membership", organization_id=organization_id, actor_user_id=user.id, resource_id=target.id, details={"target_user_id": str(user_id), "role": target.role, "custom_role_id": str(target.custom_role_id) if target.custom_role_id else None})
     await db.commit()
     member = await db.get(User, user_id)
     return MemberResponse(id=target.id, organization_id=target.organization_id, user_id=target.user_id, role=target.role, created_at=target.created_at, email=member.email, full_name=member.full_name)
