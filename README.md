@@ -57,14 +57,14 @@ The frontend defaults to `http://127.0.0.1:8000` for the API. Set `VITE_API_BASE
 
 ## First-time platform bootstrap
 
-Public registration and self-service organization creation are intentionally disabled. The first Platform Super Admin must be provisioned by a trusted operator. The existing helper grants platform access to an already-created user:
+Public registration and self-service organization creation are intentionally disabled. After migrations, create the first Platform Super Admin using the trusted operator CLI. It creates the account if it does not exist, asks for the password interactively, and grants platform access:
 
 ```powershell
 cd backend
-python -m scripts.grant_platform_admin --email admin@example.com
+python -m scripts.bootstrap_platform_admin --email admin@example.com
 ```
 
-After migrations, if this is a brand-new database with no users, create the initial operator account through a one-time trusted database/bootstrap procedure before running that helper. Do not expose platform-admin assignment as a public endpoint.
+For an existing user, the same command promotes the account without changing its password. Do not expose platform-admin assignment as a public endpoint.
 
 Sign in as the Platform Super Admin and open **Platform admin** to provision an organization and issue its first Owner invitation. The Owner can then invite users to that organization.
 
