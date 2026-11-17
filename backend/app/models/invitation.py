@@ -1,13 +1,21 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
 class Invitation(Base):
     __tablename__ = "invitations"
-    __table_args__ = (UniqueConstraint("organization_id", "email", "status", name="uq_invitation_org_email_status"),)
+    __table_args__ = (
+        Index(
+            "uq_invitation_pending_org_email",
+            "organization_id",
+            "email",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
