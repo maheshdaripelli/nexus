@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
@@ -94,7 +95,11 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
     raw_token = secrets.token_urlsafe(32)
     invitation = Invitation(organization_id=organization_id, email=email, role=payload.role, token_hash=hashlib.sha256(raw_token.encode()).hexdigest(), invited_by_user_id=user.id, expires_at=datetime.now(timezone.utc)+timedelta(days=7))
     db.add(invitation)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="A pending invitation already exists for this email") from exc
     await record_audit_event(db, action="invitation.created", resource_type="invitation", organization_id=organization_id, actor_user_id=user.id, resource_id=invitation.id, details={"email": email, "role": payload.role})
     await db.commit()
     await db.refresh(invitation)
