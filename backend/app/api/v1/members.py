@@ -60,7 +60,7 @@ async def update_member_role(organization_id: UUID, user_id: UUID, payload: Memb
     await record_audit_event(db, action="member.role_updated", resource_type="membership", organization_id=organization_id, actor_user_id=user.id, resource_id=target.id, details={"target_user_id": str(user_id), "role": target.role, "custom_role_id": str(target.custom_role_id) if target.custom_role_id else None})
     await db.commit()
     member = await db.get(User, user_id)
-    return MemberResponse(id=target.id, organization_id=target.organization_id, user_id=target.user_id, role=target.role, created_at=target.created_at, email=member.email, full_name=member.full_name)
+    return MemberResponse(id=target.id, organization_id=target.organization_id, user_id=target.user_id, role=target.role, custom_role_id=target.custom_role_id, created_at=target.created_at, email=member.email, full_name=member.full_name)
 
 @router.delete("/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_member(organization_id: UUID, user_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
