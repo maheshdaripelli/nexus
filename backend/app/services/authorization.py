@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.membership import Membership
+from app.models.organization import Organization
 from app.models.role import Permission, Role, RolePermission
 
 
@@ -31,6 +32,9 @@ async def require_permission(
     )
     if membership is None:
         raise HTTPException(status_code=404, detail="Organization not found")
+    organization = await db.get(Organization, organization_id)
+    if organization is None or not organization.is_active:
+        raise HTTPException(status_code=403, detail="This organization is currently suspended")
 
     granted = BUILTIN_PERMISSIONS.get(membership.role, set())
     if "*" in granted or permission in granted:
