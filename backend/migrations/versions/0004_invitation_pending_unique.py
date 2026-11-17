@@ -8,7 +8,8 @@ depends_on = None
 
 
 def upgrade():
-    op.drop_constraint("uq_invitation_org_email_status", "invitations", type_="unique")
+    # The original 0002 migration never created uq_invitation_org_email_status.
+    # Create the partial unique index directly; it applies only to pending invites.
     op.create_index(
         "uq_invitation_pending_org_email",
         "invitations",
@@ -20,8 +21,3 @@ def upgrade():
 
 def downgrade():
     op.drop_index("uq_invitation_pending_org_email", table_name="invitations")
-    op.create_unique_constraint(
-        "uq_invitation_org_email_status",
-        "invitations",
-        ["organization_id", "email", "status"],
-    )
