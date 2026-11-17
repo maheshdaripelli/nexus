@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 class MemberRoleUpdate(BaseModel):
     role: str | None = Field(default=None, pattern="^(admin|manager|member|viewer)$")
