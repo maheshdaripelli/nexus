@@ -10,6 +10,7 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.organization import OrganizationResponse,OrganizationUpdate
 from app.services.audit import record_audit_event
+from app.services.authorization import require_permission
 router=APIRouter(prefix="/organizations",tags=["Organizations"])
 def make_slug(name:str)->str:
  base=re.sub(r"[^a-z0-9]+","-",name.lower()).strip("-") or "organization"
@@ -27,8 +28,7 @@ async def list_organizations(db:AsyncSession=Depends(get_db),current_user:User=D
  return list(result.all())
 @router.patch("/{organization_id}",response_model=OrganizationResponse)
 async def update_organization(organization_id:UUID,payload:OrganizationUpdate,db:AsyncSession=Depends(get_db),current_user:User=Depends(get_current_user)):
- m=await require_membership(db,organization_id,current_user.id)
- if m.role not in {"owner","admin"}: raise HTTPException(status_code=403,detail="You do not have permission to update this organization")
+ await require_permission(db,organization_id,current_user.id,"workspace.manage")
  org=await db.get(Organization,organization_id);org.name=payload.name.strip()
  await record_audit_event(db,action="organization.updated",resource_type="organization",organization_id=org.id,actor_user_id=current_user.id,resource_id=org.id,details={"name":org.name})
  await db.commit();await db.refresh(org);return org
