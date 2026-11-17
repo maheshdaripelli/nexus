@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Resend email delivery. Leave blank to disable sending in local development.
     RESEND_API_KEY: str = ""
     EMAIL_FROM: str = "Nexus <onboarding@resend.dev>"
+    # Routes provider requests to Resend's simulator during local development.
+    # Keep false for real delivery after a verified sender domain is configured.
+    EMAIL_TEST_MODE: bool = False
 
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
