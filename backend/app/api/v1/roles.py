@@ -40,7 +40,10 @@ async def list_roles(organization_id: UUID, db: AsyncSession = Depends(get_db), 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_role(organization_id: UUID, payload: RoleCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     await require_admin(db, organization_id, user.id)
-    role = Role(organization_id=organization_id, name=payload.name.strip(), description=payload.description, is_system=False)
+    role_name = payload.name.strip()
+    if role_name.lower() in {"owner", "admin", "manager", "member", "viewer", "custom"}:
+        raise HTTPException(status_code=400, detail="This role name is reserved for a built-in role")
+    role = Role(organization_id=organization_id, name=role_name, description=payload.description, is_system=False)
     db.add(role)
     try:
         await db.flush()
