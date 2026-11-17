@@ -12,6 +12,7 @@ class MemberResponse(BaseModel):
     organization_id: UUID
     user_id: UUID
     role: str
+    custom_role_id: UUID | None = None
     created_at: datetime
     email: EmailStr
     full_name: str
