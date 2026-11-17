@@ -57,7 +57,7 @@ The frontend defaults to `http://127.0.0.1:8000` for the API. Set `VITE_API_BASE
 
 ## First-time platform bootstrap
 
-Public registration and self-service organization creation are intentionally disabled. After migrations, create the first Platform Super Admin using the trusted operator CLI. It creates the account if it does not exist, asks for the password interactively, and grants platform access:
+Public registration and self-service organization creation are intentionally disabled. After migrations (including the organization activation migration), create the first Platform Super Admin using the trusted operator CLI. It creates the account if it does not exist, asks for the password interactively, and grants platform access:
 
 ```powershell
 cd backend
@@ -72,7 +72,8 @@ Sign in as the Platform Super Admin and open **Platform admin** to provision an 
 
 - One global user account can belong to multiple organizations.
 - Organization membership and roles are scoped to each organization.
-- Platform Super Admin access is separate from organization roles.
+- Platform Super Admin access is separate from organization roles. Platform administrators can view global metrics, search and inspect organizations, rename workspaces, suspend/reactivate access, and grant/revoke other platform administrator accounts.
+- Suspended organizations are blocked from workspace APIs and cannot accept pending invitations. Suspension preserves organization data; permanent deletion is intentionally not exposed as a one-click operation.
 - Public registration is disabled; a valid invitation is required to create a new account.
 - Existing users accept invitations after signing in with the invited email address.
 - Invitation tokens are random, single-use, stored as SHA-256 hashes, and expire after seven days.
