@@ -12,6 +12,7 @@ from app.models.invitation import Invitation
 from app.models.membership import Membership
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
+from app.services.audit import record_audit_event
 from app.schemas.auth import LoginRequest,RefreshRequest,TokenResponse,UserResponse
 router=APIRouter(prefix="/auth",tags=["Authentication"])
 class InvitationRegistration(BaseModel):
@@ -38,6 +39,7 @@ async def register_from_invitation(payload:InvitationRegistration,db:AsyncSessio
  db.add(user);await db.flush()
  db.add(Membership(organization_id=invitation.organization_id,user_id=user.id,role=invitation.role))
  invitation.status="accepted";invitation.accepted_at=now
+ await record_audit_event(db,action="invitation.accepted",resource_type="invitation",organization_id=invitation.organization_id,actor_user_id=user.id,resource_id=invitation.id,details={"email":email,"role":invitation.role})
  await db.flush()
  return await issue_tokens(db,user)
 @router.post("/login",response_model=TokenResponse)
