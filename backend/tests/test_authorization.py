@@ -28,7 +28,7 @@ class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_owner_has_all_permissions(self):
         membership = SimpleNamespace(role="owner", custom_role_id=None)
-        db = SimpleNamespace(scalar=AsyncMock(return_value=membership))
+        db = SimpleNamespace(scalar=AsyncMock(return_value=membership), get=AsyncMock(return_value=SimpleNamespace(is_active=True)))
 
         result = await require_permission(db, uuid4(), uuid4(), "workspace.manage")
 
@@ -56,7 +56,7 @@ class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_custom_role_permission_is_checked(self):
         membership = SimpleNamespace(role="custom", custom_role_id=uuid4())
-        db = SimpleNamespace(scalar=AsyncMock(side_effect=[membership, uuid4()]))
+        db = SimpleNamespace(scalar=AsyncMock(side_effect=[membership, uuid4()]), get=AsyncMock(return_value=SimpleNamespace(is_active=True)))
 
         result = await require_permission(db, uuid4(), uuid4(), "workspace.manage")
 
@@ -65,7 +65,7 @@ class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_custom_role_without_permission_is_denied(self):
         membership = SimpleNamespace(role="custom", custom_role_id=uuid4())
-        db = SimpleNamespace(scalar=AsyncMock(side_effect=[membership, None]))
+        db = SimpleNamespace(scalar=AsyncMock(side_effect=[membership, None]), get=AsyncMock(return_value=SimpleNamespace(is_active=True)))
 
         with self.assertRaises(HTTPException) as raised:
             await require_permission(db, uuid4(), uuid4(), "workspace.manage")
