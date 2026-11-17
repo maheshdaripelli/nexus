@@ -10,9 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
+    recipient = (
+        "delivered@resend.dev"
+        if settings.EMAIL_TEST_MODE
+        else to_email
+    )
     payload = json.dumps({
         "from": settings.EMAIL_FROM,
-        "to": [to_email],
+        "to": [recipient],
         "subject": subject,
         "html": html,
         "text": text_body,
