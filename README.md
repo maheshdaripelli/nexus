@@ -76,6 +76,7 @@ Sign in as the Platform Super Admin and open **Platform admin** to provision an 
 - Public registration is disabled; a valid invitation is required to create a new account.
 - Existing users accept invitations after signing in with the invited email address.
 - Invitation tokens are random, single-use, stored as SHA-256 hashes, and expire after seven days.
+- Users can update their personal display name; email addresses remain immutable through the profile UI.
 - Custom roles are assigned to memberships and their permissions are checked by the backend.
 - Team and member records are always queried through the active organization scope.
 - Audit events are written for core membership, invitation, team, role, and organization changes.
