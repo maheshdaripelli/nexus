@@ -5,10 +5,21 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
+from pydantic import ValidationError
+
+from app.schemas.member import MemberRoleUpdate
 from app.services.authorization import require_permission
 
 
 class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
+    def test_member_role_update_requires_exactly_one_role_source(self):
+        MemberRoleUpdate(role="manager")
+        MemberRoleUpdate(custom_role_id=uuid4())
+        with self.assertRaises(ValidationError):
+            MemberRoleUpdate()
+        with self.assertRaises(ValidationError):
+            MemberRoleUpdate(role="manager", custom_role_id=uuid4())
+
     async def test_owner_has_all_permissions(self):
         membership = SimpleNamespace(role="owner", custom_role_id=None)
         db = SimpleNamespace(scalar=AsyncMock(return_value=membership))
