@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { authApi, clearSession, getAccessToken, getRefreshToken, saveSession, type TokenResponse } from "../lib/api";
 
 type AuthUser = TokenResponse["user"];
-type AuthContextValue = { user: AuthUser | null; loading: boolean; login: (email: string, password: string) => Promise<void>; logout: () => Promise<void>; };
+type AuthContextValue = { user: AuthUser | null; loading: boolean; login: (email: string, password: string) => Promise<void>; updateProfile: (fullName: string) => Promise<void>; logout: () => Promise<void>; };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -25,6 +25,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await authApi.login({email, password});
       saveSession(result.access_token, result.refresh_token);
       setUser(result.user);
+    },
+    async updateProfile(fullName) {
+      const updated = await authApi.updateProfile(fullName);
+      setUser(updated);
     },
     async logout() {
       const refresh = getRefreshToken();
