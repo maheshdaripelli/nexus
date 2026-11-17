@@ -7,7 +7,8 @@ import Badge from "../components/Badge";
 import { apiRequest } from "../lib/api";
 
 type Member={id:string;organization_id:string;user_id:string;role:string;custom_role_id?:string|null;created_at:string;email:string;full_name:string};
-type Invitation={id:string;email:string;role:string;status:string;expires_at:string;invitation_token:string;email_sent:boolean};\ntype CustomRole={id:string;name:string};
+type Invitation={id:string;email:string;role:string;status:string;expires_at:string;invitation_token:string;email_sent:boolean};
+type CustomRole={id:string;name:string};
 const orgId=()=>localStorage.getItem("nexus.organization_id");
 export default function UsersPage(){
  const id=orgId();const qc=useQueryClient();
@@ -15,7 +16,8 @@ export default function UsersPage(){
  const [email,setEmail]=useState("");const [role,setRole]=useState("member");
  const [invitation,setInvitation]=useState<Invitation|null>(null);
  const [inviteError,setInviteError]=useState("");const [pageError,setPageError]=useState("");
- const members=useQuery({queryKey:["members",id],enabled:!!id,queryFn:()=>apiRequest<Member[]>(`/api/v1/organizations/${id}/members`)});\n const customRoles=useQuery({queryKey:["roles",id],enabled:!!id,queryFn:()=>apiRequest<CustomRole[]>(`/api/v1/organizations/${id}/roles`)});
+ const members=useQuery({queryKey:["members",id],enabled:!!id,queryFn:()=>apiRequest<Member[]>(`/api/v1/organizations/${id}/members`)});
+ const customRoles=useQuery({queryKey:["roles",id],enabled:!!id,queryFn:()=>apiRequest<CustomRole[]>(`/api/v1/organizations/${id}/roles`)});
  const invite=useMutation({mutationFn:()=>apiRequest<Invitation>(`/api/v1/organizations/${id}/invitations`,{method:"POST",body:JSON.stringify({email:email.trim(),role})}),onSuccess:r=>{setInvitation(r);setInviteError("");setEmail("");setInviteOpen(false);qc.invalidateQueries({queryKey:["members",id]});},onError:e=>setInviteError(e instanceof Error?e.message:"Invitation failed")});
  const update=useMutation({mutationFn:({userId,nextRole}:{userId:string;nextRole:string})=>apiRequest<Member>(`/api/v1/organizations/${id}/members/${userId}`,{method:"PATCH",body:JSON.stringify(nextRole.startsWith("custom:")?{custom_role_id:nextRole.slice(7)}:{role:nextRole})}),onSuccess:()=>qc.invalidateQueries({queryKey:["members",id]}),onError:e=>setPageError(e instanceof Error?e.message:"Unable to update member role")});
  const remove=useMutation({mutationFn:(userId:string)=>apiRequest<void>(`/api/v1/organizations/${id}/members/${userId}`,{method:"DELETE"}),onSuccess:()=>qc.invalidateQueries({queryKey:["members",id]}),onError:e=>setPageError(e instanceof Error?e.message:"Unable to remove member")});
