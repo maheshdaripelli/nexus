@@ -86,8 +86,11 @@ async def create_invitation(organization_id: UUID, payload: InvitationCreate, db
     existing_user = await db.scalar(select(User).where(User.email == email))
     if existing_user and await db.scalar(select(Membership.id).where(Membership.organization_id == organization_id, Membership.user_id == existing_user.id)):
         raise HTTPException(status_code=409, detail="User is already a member")
-    if await db.scalar(select(Invitation.id).where(Invitation.organization_id == organization_id, Invitation.email == email, Invitation.status == "pending")):
-        raise HTTPException(status_code=409, detail="A pending invitation already exists for this email")
+    pending_invitation = await db.scalar(select(Invitation).where(Invitation.organization_id == organization_id, Invitation.email == email, Invitation.status == "pending").with_for_update())
+    if pending_invitation is not None:
+        if pending_invitation.expires_at > datetime.now(timezone.utc):
+            raise HTTPException(status_code=409, detail="A pending invitation already exists for this email")
+        pending_invitation.status = "expired"
     raw_token = secrets.token_urlsafe(32)
     invitation = Invitation(organization_id=organization_id, email=email, role=payload.role, token_hash=hashlib.sha256(raw_token.encode()).hexdigest(), invited_by_user_id=user.id, expires_at=datetime.now(timezone.utc)+timedelta(days=7))
     db.add(invitation)
