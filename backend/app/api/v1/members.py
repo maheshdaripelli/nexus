@@ -133,3 +133,60 @@ async def accept_invitation(token: str, db: AsyncSession = Depends(get_db), user
     await record_audit_event(db, action="invitation.accepted", resource_type="invitation", organization_id=invitation.organization_id, actor_user_id=user.id, resource_id=invitation.id, details={"email": invitation.email})
     await db.commit()
     return {"organization_id": str(invitation.organization_id), "message": "Invitation accepted"}
+
+
+@router.get("/invitations")
+async def list_invitations(
+    organization_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await admin_membership(db, organization_id, user.id)
+    rows = (await db.scalars(
+        select(Invitation)
+        .where(Invitation.organization_id == organization_id)
+        .order_by(Invitation.created_at.desc())
+    )).all()
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "id": str(row.id),
+            "email": row.email,
+            "role": row.role,
+            "status": "expired" if row.status == "pending" and row.expires_at <= now else row.status,
+            "expires_at": row.expires_at,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
+
+
+@router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_invitation(
+    organization_id: UUID,
+    invitation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await admin_membership(db, organization_id, user.id)
+    invitation = await db.scalar(
+        select(Invitation).where(
+            Invitation.id == invitation_id,
+            Invitation.organization_id == organization_id,
+        ).with_for_update()
+    )
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if invitation.status != "pending" or invitation.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=409, detail="Only active pending invitations can be revoked")
+    invitation.status = "revoked"
+    await record_audit_event(
+        db,
+        action="invitation.revoked",
+        resource_type="invitation",
+        organization_id=organization_id,
+        actor_user_id=user.id,
+        resource_id=invitation.id,
+        details={"email": invitation.email},
+    )
+    await db.commit()
