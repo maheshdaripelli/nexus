@@ -1,12 +1,12 @@
 # Nexus
 
-Nexus is a multi-tenant workspace and organization management application. The repository contains a FastAPI + SQLAlchemy async backend and a React + TypeScript + Vite frontend.
+Nexus is a multi-tenant organization and workspace management application. It includes a FastAPI + async SQLAlchemy + PostgreSQL backend and a React + TypeScript + Vite frontend.
 
-## Prerequisites
+## Stack and prerequisites
 
-- Python 3.12 recommended
+- Python 3.12
 - Node.js 22
-- PostgreSQL 15 or later
+- PostgreSQL 15+
 - Git
 
 ## Backend setup (Windows PowerShell)
@@ -21,35 +21,30 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `backend/.env` with your local PostgreSQL connection string and a strong random JWT secret. Do not commit this file.
-
-Example:
+Create a PostgreSQL database named `nexus` and a database user with access to it. Set `DATABASE_URL` in `backend/.env` to:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://nexus_app:YOUR_PASSWORD@localhost:5432/nexus
 JWT_SECRET_KEY=REPLACE_WITH_A_LONG_RANDOM_SECRET
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
 FRONTEND_ORIGIN=http://localhost:5173
 ```
 
-Create the database and a database user in PostgreSQL, then from `backend`:
+Also configure the SMTP values if you want invitation emails to be delivered. For Gmail, use a Google App Password, not your normal account password. Keep `.env` private and never commit secrets.
+
+Run migrations and start the API from the `backend` directory:
 
 ```powershell
 alembic upgrade head
 python -m uvicorn app.main:app --reload
 ```
 
-Useful URLs:
+API docs: http://127.0.0.1:8000/docs
 
-- API docs: http://127.0.0.1:8000/docs
-- Health: http://127.0.0.1:8000/health
-- Database health: http://127.0.0.1:8000/health/database
+Health checks: http://127.0.0.1:8000/health and http://127.0.0.1:8000/health/database
 
 ## Frontend setup
 
-Open another terminal:
+In a second terminal from the repository root:
 
 ```powershell
 cd frontend
@@ -58,39 +53,50 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-The frontend defaults to the API at `http://127.0.0.1:8000`. Change `VITE_API_BASE_URL` in `frontend/.env` only if your API runs elsewhere.
+The frontend defaults to `http://127.0.0.1:8000` for the API. Set `VITE_API_BASE_URL` in `frontend/.env` if your backend uses another address. Open http://localhost:5173.
 
-Open http://localhost:5173.
+## First-time platform bootstrap
 
-## First-use flow
-
-1. Register a user.
-2. Create a workspace during onboarding (the creator becomes its owner).
-3. Use Overview, Users, Teams, Roles, Audit Logs and Settings.
-4. To invite someone, create an invitation and share the generated acceptance link. Email delivery is not configured; the API currently returns a development token.
-5. The invited person must register or sign in using the invited email before accepting the invitation.
-
-## Platform Super Admin
-
-Platform administration is separate from organization membership. To grant the role to an existing user, run this trusted operator command from the `backend` directory:
+Public registration and self-service organization creation are intentionally disabled. The first Platform Super Admin must be provisioned by a trusted operator. The existing helper grants platform access to an already-created user:
 
 ```powershell
+cd backend
 python -m scripts.grant_platform_admin --email admin@example.com
 ```
 
-The account must already exist. This command writes to the `platform_admins` table; there is intentionally no public self-promotion endpoint.
+After migrations, if this is a brand-new database with no users, create the initial operator account through a one-time trusted database/bootstrap procedure before running that helper. Do not expose platform-admin assignment as a public endpoint.
 
-Then sign in as that account and open the Platform admin section.
+Sign in as the Platform Super Admin and open **Platform admin** to provision an organization and issue its first Owner invitation. The Owner can then invite users to that organization.
 
-## Current implementation notes
+## Product behavior
 
-- Organization membership roles (owner/admin/manager/member/viewer) are currently the authorization values used by several endpoints.
-- Custom roles and permission sets can be created and edited, but they are not yet connected to membership assignment or consistently enforced as granular authorization rules.
-- Audit events are recorded for the main organization, team, invitation, member-role and role-management mutations. Other actions may not yet emit audit events.
-- Invitation email delivery, password reset, MFA, notification delivery, billing, and production deployment configuration are not included.
-- Platform admin dashboard is read-only for global overview and organization listing.
-- This project is a development MVP, not yet a production security-reviewed service.
+- One global user account can belong to multiple organizations.
+- Organization membership and roles are scoped to each organization.
+- Platform Super Admin access is separate from organization roles.
+- Public registration is disabled; a valid invitation is required to create a new account.
+- Existing users accept invitations after signing in with the invited email address.
+- Invitation tokens are random, single-use, stored as SHA-256 hashes, and expire after seven days.
+- Custom roles are assigned to memberships and their permissions are checked by the backend.
+- Team and member records are always queried through the active organization scope.
+- Audit events are written for core membership, invitation, team, role, and organization changes.
 
-## Validation
+## Local validation
 
-GitHub Actions workflow `.github/workflows/nexus-ci.yml` installs backend dependencies, compiles backend modules, installs frontend dependencies, and runs the frontend TypeScript/Vite production build. Database integration tests and full API behavior tests still need to be added.
+Run backend unit tests from `backend`:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+Build and type-check the frontend from `frontend`:
+
+```powershell
+npm ci
+npm run build
+```
+
+GitHub Actions runs backend compilation, backend authorization unit tests, and the frontend TypeScript/Vite build. These checks do not replace local PostgreSQL-backed API and end-to-end testing.
+
+## Not included
+
+Password reset, MFA, billing, external SSO, production hosting configuration, and a full production security audit are outside the current MVP scope. Review deployment secrets, HTTPS, database backups, CORS origins, and rate limiting before a public production launch.
