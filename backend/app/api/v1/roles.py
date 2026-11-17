@@ -91,6 +91,9 @@ async def delete_role(
         raise HTTPException(status_code=404, detail="Role not found")
     if role.is_system:
         raise HTTPException(status_code=400, detail="System roles cannot be deleted")
+    assigned = await db.scalar(select(Membership.id).where(Membership.custom_role_id == role.id).limit(1))
+    if assigned is not None:
+        raise HTTPException(status_code=409, detail="This role is assigned to members. Reassign them before deleting it.")
     await record_audit_event(
         db,
         action="role.deleted",
