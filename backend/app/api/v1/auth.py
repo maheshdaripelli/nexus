@@ -13,7 +13,7 @@ from app.models.membership import Membership
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.services.audit import record_audit_event
-from app.schemas.auth import LoginRequest,RefreshRequest,TokenResponse,UserResponse
+from app.schemas.auth import LoginRequest,RefreshRequest,TokenResponse,UserProfileUpdate,UserResponse
 router=APIRouter(prefix="/auth",tags=["Authentication"])
 class InvitationRegistration(BaseModel):
  token:str=Field(min_length=20,max_length=256)
@@ -62,3 +62,10 @@ async def logout(payload:RefreshRequest,db:AsyncSession=Depends(get_db),user:Use
  if stored is not None: stored.revoked=True;await db.commit()
 @router.get("/me",response_model=UserResponse)
 async def me(current_user:User=Depends(get_current_user)): return current_user
+
+@router.patch("/me",response_model=UserResponse)
+async def update_profile(payload:UserProfileUpdate,db:AsyncSession=Depends(get_db),current_user:User=Depends(get_current_user)):
+ current_user.full_name=payload.full_name
+ await db.commit()
+ await db.refresh(current_user)
+ return current_user
