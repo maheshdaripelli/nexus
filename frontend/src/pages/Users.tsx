@@ -6,7 +6,7 @@ import SectionHeading from "../components/SectionHeading";
 import Badge from "../components/Badge";
 import { apiRequest } from "../lib/api";
 
-type Member={id:string;organization_id:string;user_id:string;role:string;created_at:string;email:string;full_name:string};
+type Member={id:string;organization_id:string;user_id:string;role:string;custom_role_id?:string|null;created_at:string;email:string;full_name:string};
 type Invitation={id:string;email:string;role:string;status:string;expires_at:string;invitation_token:string;email_sent:boolean};
 const orgId=()=>localStorage.getItem("nexus.organization_id");
 export default function UsersPage(){
