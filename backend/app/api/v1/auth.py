@@ -49,7 +49,7 @@ async def login(payload:LoginRequest,db:AsyncSession=Depends(get_db)):
  return await issue_tokens(db,user)
 @router.post("/refresh",response_model=TokenResponse)
 async def refresh(payload:RefreshRequest,db:AsyncSession=Depends(get_db)):
- stored=await db.scalar(select(RefreshToken).where(RefreshToken.token_hash==hash_refresh_token(payload.refresh_token),RefreshToken.revoked.is_(False)))
+ stored=await db.scalar(select(RefreshToken).where(RefreshToken.token_hash==hash_refresh_token(payload.refresh_token),RefreshToken.revoked.is_(False)).with_for_update())
  now=datetime.now(timezone.utc)
  if stored is None or stored.expires_at<=now: raise HTTPException(status_code=401,detail="Refresh token is invalid or expired")
  user=await db.get(User,stored.user_id)
