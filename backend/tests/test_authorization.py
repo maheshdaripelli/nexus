@@ -7,11 +7,17 @@ from fastapi import HTTPException
 
 from pydantic import ValidationError
 
+from app.schemas.auth import UserProfileUpdate
 from app.schemas.member import MemberRoleUpdate
 from app.services.authorization import require_permission
 
 
 class AuthorizationTests(unittest.IsolatedAsyncioTestCase):
+    def test_profile_name_is_trimmed_and_validated(self):
+        self.assertEqual(UserProfileUpdate(full_name="  Mahesh Daripelli  ").full_name, "Mahesh Daripelli")
+        with self.assertRaises(ValidationError):
+            UserProfileUpdate(full_name="   ")
+
     def test_member_role_update_requires_exactly_one_role_source(self):
         MemberRoleUpdate(role="manager")
         MemberRoleUpdate(custom_role_id=uuid4())
