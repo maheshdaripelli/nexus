@@ -3,7 +3,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class MemberRoleUpdate(BaseModel):
-    role: str = Field(pattern="^(admin|manager|member|viewer)$")
+    role: str | None = Field(default=None, pattern="^(admin|manager|member|viewer)$")
+    custom_role_id: UUID | None = None
 
 class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
