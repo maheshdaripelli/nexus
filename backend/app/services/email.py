@@ -1,6 +1,9 @@
 import asyncio
 import json
 import logging
+import smtplib
+from email.message import EmailMessage
+from email.utils import formataddr
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -10,13 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
-    recipient = (
-        "delivered@resend.dev"
-        if settings.EMAIL_TEST_MODE
-        else to_email
-    )
+    recipient = "delivered@resend.dev" if settings.EMAIL_TEST_MODE else to_email
     payload = json.dumps({
-        "from": settings.EMAIL_FROM,
+        "from": settings.RESEND_FROM,
         "to": [recipient],
         "subject": subject,
         "html": html,
@@ -37,16 +36,46 @@ def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str
             response.read()
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Email provider rejected the request (HTTP {exc.code}): {detail[:500]}") from exc
+        raise RuntimeError(
+            f"Email provider rejected the request (HTTP {exc.code}): {detail[:500]}"
+        ) from exc
     except (URLError, TimeoutError) as exc:
         raise RuntimeError(f"Could not reach the email provider: {exc}") from exc
 
 
-async def send_invitation_email(*, to_email: str, organization_name: str, role: str, invitation_url: str, expires_at: str) -> bool:
-    if not settings.RESEND_API_KEY or not settings.EMAIL_FROM:
-        logger.warning("Invitation email not sent: RESEND_API_KEY or EMAIL_FROM is not configured")
-        return False
+def _send_smtp_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
+    if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
+        raise RuntimeError(
+            "SMTP is not configured. Set SMTP_USERNAME and SMTP_PASSWORD "
+            "in backend/.env. For Gmail, use a Google App Password."
+        )
 
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = formataddr((settings.EMAIL_FROM or "Nexus", settings.SMTP_USERNAME))
+    message["To"] = to_email
+    message.set_content(text_body)
+    message.add_alternative(html, subtype="html")
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            server.send_message(message)
+    except (smtplib.SMTPException, OSError) as exc:
+        raise RuntimeError(f"SMTP email delivery failed: {exc}") from exc
+
+
+async def send_invitation_email(
+    *,
+    to_email: str,
+    organization_name: str,
+    role: str,
+    invitation_url: str,
+    expires_at: str,
+) -> bool:
     safe_org = organization_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     safe_role = role.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     html = f"""
@@ -65,15 +94,34 @@ async def send_invitation_email(*, to_email: str, organization_name: str, role: 
         f"Accept your invitation: {invitation_url}\n\n"
         f"This invitation expires on {expires_at} (UTC). If you weren't expecting it, ignore this email."
     )
+    subject = f"You're invited to join {organization_name} on Nexus"
+
     try:
-        await asyncio.to_thread(
-            _send_resend_email,
-            to_email=to_email,
-            subject=f"You're invited to join {organization_name} on Nexus",
-            html=html,
-            text_body=text_body,
-        )
-        logger.info("Invitation email sent to %s", to_email)
+        provider = settings.EMAIL_PROVIDER.strip().lower()
+        if provider == "smtp":
+            await asyncio.to_thread(
+                _send_smtp_email,
+                to_email=to_email,
+                subject=subject,
+                html=html,
+                text_body=text_body,
+            )
+        elif provider == "resend":
+            if not settings.RESEND_API_KEY:
+                raise RuntimeError("RESEND_API_KEY is not configured.")
+            await asyncio.to_thread(
+                _send_resend_email,
+                to_email=to_email,
+                subject=subject,
+                html=html,
+                text_body=text_body,
+            )
+        else:
+            raise RuntimeError(
+                f"Unsupported EMAIL_PROVIDER '{settings.EMAIL_PROVIDER}'. Use 'smtp' or 'resend'."
+            )
+
+        logger.info("Invitation email accepted by %s for %s", provider, to_email)
         return True
     except Exception:
         logger.exception("Failed to send invitation email to %s", to_email)
