@@ -122,6 +122,8 @@ export const authApi = {
   login: (payload: { email: string; password: string }) =>
     apiRequest<TokenResponse>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   me: () => apiRequest<TokenResponse["user"]>("/api/v1/auth/me"),
+  updateProfile: (full_name: string) =>
+    apiRequest<TokenResponse["user"]>("/api/v1/auth/me", { method: "PATCH", body: JSON.stringify({ full_name }) }),
   logout: (refresh_token: string) =>
     apiRequest<void>("/api/v1/auth/logout", { method: "POST", body: JSON.stringify({ refresh_token }) })
 };
