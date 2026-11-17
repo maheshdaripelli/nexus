@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models.invitation import Invitation
 from app.models.membership import Membership
 from app.models.refresh_token import RefreshToken
+from app.models.organization import Organization
 from app.models.user import User
 from app.services.audit import record_audit_event
 from app.schemas.auth import LoginRequest,RefreshRequest,TokenResponse,UserProfileUpdate,UserResponse
@@ -33,6 +34,8 @@ async def register_from_invitation(payload:InvitationRegistration,db:AsyncSessio
  invitation=await db.scalar(select(Invitation).where(Invitation.token_hash==digest,Invitation.status=="pending").with_for_update())
  now=datetime.now(timezone.utc)
  if invitation is None or invitation.expires_at<=now: raise HTTPException(status_code=400,detail="Invitation is invalid, expired, or already used")
+ organization=await db.get(Organization,invitation.organization_id)
+ if organization is None or not organization.is_active: raise HTTPException(status_code=403,detail="This organization is currently suspended")
  email=invitation.email.strip().lower()
  if await db.scalar(select(User.id).where(User.email==email)): raise HTTPException(status_code=409,detail="An account already exists for this email. Sign in and accept the invitation.")
  user=User(email=email,full_name=payload.full_name.strip(),password_hash=hash_password(payload.password),is_active=True)
