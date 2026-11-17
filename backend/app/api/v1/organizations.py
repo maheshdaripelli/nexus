@@ -24,7 +24,7 @@ async def disabled_organization_creation():
  raise HTTPException(status_code=403,detail="Organizations can only be provisioned by a Nexus Platform Super Admin.")
 @router.get("",response_model=list[OrganizationResponse])
 async def list_organizations(db:AsyncSession=Depends(get_db),current_user:User=Depends(get_current_user)):
- result=await db.scalars(select(Organization).join(Membership).where(Membership.user_id==current_user.id).order_by(Organization.created_at.desc()))
+ result=await db.scalars(select(Organization).join(Membership).where(Membership.user_id==current_user.id,Organization.is_active.is_(True)).order_by(Organization.created_at.desc()))
  return list(result.all())
 @router.patch("/{organization_id}",response_model=OrganizationResponse)
 async def update_organization(organization_id:UUID,payload:OrganizationUpdate,db:AsyncSession=Depends(get_db),current_user:User=Depends(get_current_user)):
