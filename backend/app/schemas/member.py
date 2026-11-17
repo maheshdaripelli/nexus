@@ -6,6 +6,12 @@ class MemberRoleUpdate(BaseModel):
     role: str | None = Field(default=None, pattern="^(admin|manager|member|viewer)$")
     custom_role_id: UUID | None = None
 
+    @model_validator(mode="after")
+    def validate_single_role_source(self):
+        if (self.role is None) == (self.custom_role_id is None):
+            raise ValueError("Provide exactly one of role or custom_role_id")
+        return self
+
 class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
