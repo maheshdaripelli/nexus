@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Email provider: "smtp", "resend", or "brevo".
-    EMAIL_PROVIDER: str = "brevo"
+    # Email provider: Google Apps Script is the zero-cost default; SMTP/Resend/Brevo remain optional.
+    EMAIL_PROVIDER: str = "google_apps_script"
     EMAIL_FROM: str = "Nexus"
 
     # Gmail SMTP (use a Google App Password, never your normal account password).
@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM: str = "Nexus <onboarding@resend.dev>"
     EMAIL_TEST_MODE: bool = False
+
+    # Google Apps Script email gateway, used by the default provider.
+    GOOGLE_APPS_SCRIPT_URL: str = ""
+    GOOGLE_APPS_SCRIPT_TOKEN: str = ""
+    GOOGLE_APPS_SCRIPT_SENDER_NAME: str = "Nexus"
 
     # Brevo transactional email API, used when EMAIL_PROVIDER="brevo".
     BREVO_API_KEY: str = ""
