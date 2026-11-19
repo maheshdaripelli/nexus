@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Email provider: "smtp", "resend", or "brevo".
-    EMAIL_PROVIDER: str = "smtp"
+    EMAIL_PROVIDER: str = "brevo"
     EMAIL_FROM: str = "Nexus"
 
     # Gmail SMTP (use a Google App Password, never your normal account password).
