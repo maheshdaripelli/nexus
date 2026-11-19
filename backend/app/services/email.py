@@ -12,35 +12,66 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
-    recipient = "delivered@resend.dev" if settings.EMAIL_TEST_MODE else to_email
-    payload = json.dumps({
-        "from": settings.RESEND_FROM,
-        "to": [recipient],
-        "subject": subject,
-        "html": html,
-        "text": text_body,
-    }).encode("utf-8")
+def _post_email_api(*, endpoint: str, headers: dict[str, str], payload: dict) -> None:
     request = Request(
-        "https://api.resend.com/emails",
-        data=payload,
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            **headers,
             "Content-Type": "application/json",
             "User-Agent": "Nexus-API",
         },
         method="POST",
     )
     try:
-        with urlopen(request, timeout=15) as response:
+        with urlopen(request, timeout=20) as response:
             response.read()
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(
             f"Email provider rejected the request (HTTP {exc.code}): {detail[:500]}"
         ) from exc
-    except (URLError, TimeoutError) as exc:
+    except (URLError, TimeoutError, OSError) as exc:
         raise RuntimeError(f"Could not reach the email provider: {exc}") from exc
+
+
+def _send_brevo_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
+    if not settings.BREVO_API_KEY:
+        raise RuntimeError("BREVO_API_KEY is not configured.")
+    if not settings.BREVO_SENDER_EMAIL:
+        raise RuntimeError("BREVO_SENDER_EMAIL is not configured.")
+
+    payload = {
+        "sender": {
+            "name": settings.BREVO_SENDER_NAME,
+            "email": settings.BREVO_SENDER_EMAIL,
+        },
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html,
+        "textContent": text_body,
+    }
+    _post_email_api(
+        endpoint="https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": settings.BREVO_API_KEY},
+        payload=payload,
+    )
+
+
+def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
+    recipient = "delivered@resend.dev" if settings.EMAIL_TEST_MODE else to_email
+    payload = {
+        "from": settings.RESEND_FROM,
+        "to": [recipient],
+        "subject": subject,
+        "html": html,
+        "text": text_body,
+    }
+    _post_email_api(
+        endpoint="https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+        payload=payload,
+    )
 
 
 def _send_smtp_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
@@ -78,13 +109,19 @@ async def send_invitation_email(
 ) -> bool:
     safe_org = organization_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     safe_role = role.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    safe_url = (
+        invitation_url.replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#172033;line-height:1.6">
       <h1 style="font-size:24px">You're invited to join {safe_org}</h1>
       <p>You have been invited to join <strong>{safe_org}</strong> on Nexus as a <strong>{safe_role}</strong>.</p>
-      <p style="margin:28px 0"><a href="{invitation_url}" style="background:#4f46e5;color:#fff;text-decoration:none;padding:13px 22px;border-radius:8px;display:inline-block">Accept invitation</a></p>
+      <p style="margin:28px 0"><a href="{safe_url}" style="background:#4f46e5;color:#fff;text-decoration:none;padding:13px 22px;border-radius:8px;display:inline-block">Accept invitation</a></p>
       <p>If the button doesn't work, copy and paste this link into your browser:</p>
-      <p style="word-break:break-all"><a href="{invitation_url}">{invitation_url}</a></p>
+      <p style="word-break:break-all"><a href="{safe_url}">{safe_url}</a></p>
       <p>This invitation expires on {expires_at} (UTC). If you weren't expecting it, you can ignore this email.</p>
       <p>— The Nexus team</p>
     </div>
@@ -116,9 +153,18 @@ async def send_invitation_email(
                 html=html,
                 text_body=text_body,
             )
+        elif provider == "brevo":
+            await asyncio.to_thread(
+                _send_brevo_email,
+                to_email=to_email,
+                subject=subject,
+                html=html,
+                text_body=text_body,
+            )
         else:
             raise RuntimeError(
-                f"Unsupported EMAIL_PROVIDER '{settings.EMAIL_PROVIDER}'. Use 'smtp' or 'resend'."
+                f"Unsupported EMAIL_PROVIDER '{settings.EMAIL_PROVIDER}'. "
+                "Use 'smtp', 'resend', or 'brevo'."
             )
 
         logger.info("Invitation email accepted by %s for %s", provider, to_email)
