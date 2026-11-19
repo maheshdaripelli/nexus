@@ -74,6 +74,43 @@ def _send_resend_email(*, to_email: str, subject: str, html: str, text_body: str
     )
 
 
+def _send_google_apps_script_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
+    if not settings.GOOGLE_APPS_SCRIPT_URL:
+        raise RuntimeError("GOOGLE_APPS_SCRIPT_URL is not configured.")
+    if not settings.GOOGLE_APPS_SCRIPT_TOKEN:
+        raise RuntimeError("GOOGLE_APPS_SCRIPT_TOKEN is not configured.")
+
+    payload = {
+        "token": settings.GOOGLE_APPS_SCRIPT_TOKEN,
+        "to": to_email,
+        "subject": subject,
+        "htmlBody": html,
+        "textBody": text_body,
+        "senderName": settings.GOOGLE_APPS_SCRIPT_SENDER_NAME,
+    }
+    request = Request(
+        settings.GOOGLE_APPS_SCRIPT_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "Nexus-API"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Google Apps Script rejected the request (HTTP {exc.code}): {detail[:500]}"
+        ) from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise RuntimeError(f"Could not reach Google Apps Script: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Google Apps Script returned an invalid response.") from exc
+
+    if not result.get("ok"):
+        raise RuntimeError(result.get("error", "Google Apps Script email delivery failed."))
+
+
 def _send_smtp_email(*, to_email: str, subject: str, html: str, text_body: str) -> None:
     if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
         raise RuntimeError(
@@ -135,7 +172,15 @@ async def send_invitation_email(
 
     try:
         provider = settings.EMAIL_PROVIDER.strip().lower()
-        if provider == "smtp":
+        if provider == "google_apps_script":
+            await asyncio.to_thread(
+                _send_google_apps_script_email,
+                to_email=to_email,
+                subject=subject,
+                html=html,
+                text_body=text_body,
+            )
+        elif provider == "smtp":
             await asyncio.to_thread(
                 _send_smtp_email,
                 to_email=to_email,
@@ -164,7 +209,7 @@ async def send_invitation_email(
         else:
             raise RuntimeError(
                 f"Unsupported EMAIL_PROVIDER '{settings.EMAIL_PROVIDER}'. "
-                "Use 'smtp', 'resend', or 'brevo'."
+                "Use 'google_apps_script', 'smtp', 'resend', or 'brevo'. "
             )
 
         logger.info("Invitation email accepted by %s for %s", provider, to_email)
