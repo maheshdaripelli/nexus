@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Email provider: "smtp" for local Gmail SMTP, or "resend" for Resend API.
+    # Email provider: "smtp", "resend", or "brevo".
     EMAIL_PROVIDER: str = "smtp"
     EMAIL_FROM: str = "Nexus"
 
@@ -36,8 +36,12 @@ class Settings(BaseSettings):
     # Resend settings, used only when EMAIL_PROVIDER="resend".
     RESEND_API_KEY: str = ""
     RESEND_FROM: str = "Nexus <onboarding@resend.dev>"
-    # Resend's simulator is only for provider testing, not real recipient delivery.
     EMAIL_TEST_MODE: bool = False
+
+    # Brevo transactional email API, used when EMAIL_PROVIDER="brevo".
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
+    BREVO_SENDER_NAME: str = "Nexus"
 
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
