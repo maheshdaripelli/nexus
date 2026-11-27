@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.api.v2.router import api_router as v2_router
+from app.messaging.broker import Broker
 from app.db.session import engine, get_db
 from app.models import Membership, Organization, Team, User  # noqa: F401
 
@@ -16,8 +18,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
-    await engine.dispose()
+    app.state.rabbitmq = Broker()
+    try:
+        yield
+    finally:
+        await app.state.rabbitmq.close()
+        await engine.dispose()
 
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, description="Nexus User and Workspace Management Platform", lifespan=lifespan)
@@ -29,6 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+if settings.ENABLE_API_V2:
+    app.include_router(v2_router, prefix="/api/v2")
 
 
 @app.get("/", tags=["Health"])

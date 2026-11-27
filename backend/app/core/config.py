@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
+    ENABLE_API_V2: bool = False
+    RABBITMQ_URL: str = ""
+
     API_V1_PREFIX: str = "/api/v1"
     FRONTEND_ORIGIN: str = "http://localhost:5173"
 
