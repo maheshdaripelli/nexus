@@ -26,3 +26,5 @@ SQLAlchemy[asyncio]==2.1.8
 uvicorn==0.40.0
 
 aio-pika>=9.5,<10
+
+redis>=5.2,<7

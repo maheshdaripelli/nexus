@@ -13,6 +13,9 @@ class Settings(BaseSettings):
 
     ENABLE_API_V2: bool = False
     RABBITMQ_URL: str = ""
+    ENABLE_REDIS_CACHE: bool = False
+    REDIS_URL: str = ""
+    REDIS_CACHE_TTL_SECONDS: int = 30
 
     API_V1_PREFIX: str = "/api/v1"
     FRONTEND_ORIGIN: str = "http://localhost:5173"

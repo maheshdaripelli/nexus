@@ -10,6 +10,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.api.v2.router import api_router as v2_router
 from app.messaging.broker import Broker
+from app.services.cache import RedisCache
 from app.db.session import engine, get_db
 from app.models import Membership, Organization, Team, User  # noqa: F401
 
@@ -19,9 +20,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.rabbitmq = Broker()
+    app.state.cache = RedisCache()
     try:
         yield
     finally:
+        await app.state.cache.close()
         await app.state.rabbitmq.close()
         await engine.dispose()
 
